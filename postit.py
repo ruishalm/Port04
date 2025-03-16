@@ -1,28 +1,35 @@
 import tkinter as tk
 from tkinter import ttk
+from utils import get_formated_date
 
-class Postit(tk.Frame):
-    def __init__(self, parent, title, content=""):
-        super().__init__(parent)
-        self.title = title
-        self.content = content
-        self.create_widgets()
+class Postit:
+    def __init__(self, master, date, selfcare=False, model=None): # agora o construtor precisa receber o model
+        self.date = date
+        self.content = ""
+        self.model = model # e ele fica salvo aqui
+        self.create_widgets(master, selfcare)
 
-    def create_widgets(self):
-        self.title_label = ttk.Label(self, text=self.title, font=('Helvetica', 16, 'bold'))
-        self.title_label.pack()
+    def create_widgets(self, master, selfcare):
+        self.frame = ttk.Frame(master, padding="5", relief=tk.RIDGE, borderwidth=2)
+        if not selfcare:
+            date_label = ttk.Label(self.frame, text=get_formated_date(self.date))
+        else:
+            date_label = ttk.Label(self.frame, text=f"Selfcare - {get_formated_date(self.date)}")
+        date_label.pack()
 
-        self.content_text = tk.Text(self, wrap='word', height=1)
-        self.content_text.insert('1.0', self.content)
-        self.content_text.pack(expand=True, fill='both')
+        self.text_widget = tk.Text(self.frame, height=5, width=20)
+        self.text_widget.pack(expand=True, fill='both')
 
-    def adjust_size(self):
-        lines = self.content_text.get("1.0", "end-1c").split("\n")
-        max_length = max(len(line) for line in lines)
-        self.content_text.config(width=max_length, height=len(lines))
+        self.save_button = ttk.Button(self.frame, text="Salvar", command=self.save)
+        self.save_button.pack(pady=(5, 0))
+
+    def get_content(self):
+        return self.text_widget.get("1.0", tk.END).strip()
 
     def set_content(self, content):
-        self.content = content
-        self.content_text.delete("1.0", "end")
-        self.content_text.insert("1.0", content)
-        self.adjust_size()
+        self.text_widget.insert(tk.END, content)
+
+    def save(self):
+        content = self.text_widget.get("1.0", tk.END).strip()
+        if self.model:
+            self.model.save_postit(self.date, content) # agora pode chamar o save, pois tem acesso ao model.
