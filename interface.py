@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from ttkbootstrap import Style
-from utils import get_formated_date
+from utils import get_formated_date, load_data, save_data
 from widgets import (
     create_next_week_frame,
     create_previous_week_frame,
@@ -13,6 +13,20 @@ import tkinter.font as tkFont
 
 
 class Interface:
+    # Mudar aqui: Movendo os metodos para cima
+    def get_current_theme(self):
+        themes = load_data("themes.json")
+        if not themes:
+            return "flatly"
+        return themes.get("current_theme")
+
+    def set_current_theme(self, theme):
+        themes = load_data("themes.json")
+        if not themes:
+            themes = {}
+        themes["current_theme"] = theme
+        save_data("themes.json", themes)
+
     def __init__(self, root, model):
         self.root = root
         self.model = model
@@ -20,37 +34,43 @@ class Interface:
         self.root.geometry("800x600")
         self.create_watermark()
         self.create_widgets()
-        # variaveis auxiliares
         self.edit_mode = False
         self.current_index = None
+        self.root.bind("<Configure>", self.resize_next_week_frame)
+        self.first_draw_postit = False
 
     def create_widgets(self):
         header_font = tkFont.Font(family="Helvetica", size=20, weight="bold")
+        app_name_font = tkFont.Font(family="Helvetica", size=14, weight="bold")
 
         self.header_frame = ttk.Frame(self.root, padding="10")
         self.header_frame.grid(row=0, column=0, columnspan=4, sticky="ew")
 
-        self.prev_button = ttk.Button(
-            self.header_frame, text="<- Semana Anterior", command=self.prev_week, cursor="hand2"
+        self.app_name = ttk.Label(
+            self.header_frame, text="Planner", font=app_name_font
         )
-        self.prev_button.grid(row=0, column=0, sticky="w")
+        self.app_name.grid(row=0, column=0, sticky="w", padx=(5, 10))
+
+        self.prev_button = ttk.Button(
+            self.header_frame, text="<- Semana Anterior", command=self.prev_week, cursor="hand2", style="info.Outline.TButton"
+        )
+        self.prev_button.grid(row=1, column=0, sticky="w", padx=5, pady=5)
 
         self.current_day_label = ttk.Label(
             self.header_frame, text=self.get_current_day_text(), font=header_font
         )
-        self.current_day_label.grid(row=0, column=1, sticky="w")
+        self.current_day_label.grid(row=1, column=1, sticky="w", padx=5, pady=5)
 
         self.date_label = ttk.Label(self.header_frame, text=self.get_current_week_text(), font=header_font)
-        self.date_label.grid(row=0, column=2, sticky="e")
+        self.date_label.grid(row=1, column=2, sticky="e", padx=5, pady=5)
 
         self.next_button = ttk.Button(
-            self.header_frame, text="Próxima Semana ->", command=self.next_week, cursor="hand2"
+            self.header_frame, text="Próxima Semana ->", command=self.next_week, cursor="hand2", style="info.Outline.TButton"
         )
-        self.next_button.grid(row=0, column=3, sticky="e")
+        self.next_button.grid(row=1, column=3, sticky="e", padx=5, pady=5)
 
         self.header_frame.columnconfigure(2, weight=1)
 
-        # Chamando a funcao que criar o Frame, que foi movido para outro arquivo
         self.previous_week_frame = create_previous_week_frame(self.root)
         self.previous_week_frame.grid(row=1, column=0, sticky="ew")
 
@@ -60,18 +80,15 @@ class Interface:
         self.root.rowconfigure(2, weight=1)
         self.root.columnconfigure(0, weight=1)
 
-        # Chamando a funcao que criar o Frame, que foi movido para outro arquivo
         self.next_week_frame = create_next_week_frame(self.root, self)
         self.next_week_frame.grid(row=3, column=0, sticky="ew")
 
-        # Chamando a funcao que criar o Theme Selector, que foi movido para outro arquivo
         create_theme_selector(self.root, self)
-        # Ajustar a linha do seletor de temas
         self.root.rowconfigure(4, weight=0)
 
-        # Chamando a funcao que criar os postits, que foi movido para outro arquivo
         create_postits(self.main_frame, self.model)
-        # Mudança aqui: Atualizando a tela após inserir o item no Model
+        # Mudança aqui: Setando a flag para True
+        self.first_draw_postit = True
         self.update_next_week_preview()
 
         self.update_header_labels()
@@ -84,9 +101,58 @@ class Interface:
 
     def get_current_week_text(self):
         dates = self.model.get_week_dates()
-        start_date = get_formated_date(dates[0])
-        end_date = get_formated_date(dates[-1])
-        return f"Semana: {start_date} até {end_date}"
+        start_date = get_formated_date(dates[0], month_name=True)
+        end_date = get_formated_date(dates[-1], month_name=True)
+        return f"Semana: de {start_date} até {end_date}"
+
+    def update_next_week_preview(self):
+        update_next_week_preview(self)
+
+    def edit_item(self, event):
+        try:
+            self.edit_mode = True
+            selected_index = self.next_week_preview.curselection()[0]
+            selected_item = self.next_week_preview.get(selected_index)
+            self.current_index = selected_item
+            self.next_week_text.delete("1.0", tk.END)
+            self.next_week_text.insert(tk.END, selected_item)
+            self.next_week_save_button.config(text="Atualizar")
+        except IndexError:
+            pass
+
+    def on_drag_start(self, event):
+        self.current_index = self.next_week_preview.nearest(event.y)
+
+    def on_drag_motion(self, event):
+        new_index = self.next_week_preview.nearest(event.y)
+
+        if new_index != self.current_index:
+            item = self.next_week_preview.get(self.current_index)
+            self.next_week_preview.delete(self.current_index)
+            self.next_week_preview.insert(new_index, item)
+            self.current_index = new_index
+            self.model.reorder_next_week_item(item)
+
+    def remove_selected_item(self):
+        try:
+            selected_index = self.next_week_preview.curselection()[0]
+            selected_item = self.next_week_preview.get(selected_index)
+            self.model.remove_next_week_item(selected_item)
+            self.update_next_week_preview()
+        except IndexError:
+            pass
+
+    def save_next_week_item(self):
+        item = self.next_week_text.get("1.0", tk.END).strip()
+        if item:
+            if self.edit_mode:
+                self.model.edit_next_week_item(self.current_index, item)
+                self.next_week_save_button.config(text="Adicionar")
+                self.edit_mode = False
+            else:
+                self.model.add_next_week_item(item)
+            self.next_week_text.delete("1.0", tk.END)
+            self.update_next_week_preview()
 
     def prev_week(self):
         self.model.change_week(-7)
@@ -145,70 +211,23 @@ class Interface:
         self.watermark_label.config(bg=self.root.cget("background"))
         self.create_watermark()
 
-    def get_current_theme(self):
-        from utils import load_data
+    def resize_next_week_frame(self, event):
+        if not self.root.winfo_exists() or not self.first_draw_postit:
+            return
 
-        themes = load_data("themes.json")
-        if not themes:
-            return "flatly"
-        return themes.get("current_theme")
+        self.root.update_idletasks()
 
-    def set_current_theme(self, theme):
-        from utils import save_data
+        first_postit_frame = self.main_frame.winfo_children()
+        if not first_postit_frame:
+            return
+        first_postit_frame = first_postit_frame[0]
 
-        themes = load_data("themes.json")
-        if not themes:
-            themes = {}
-        themes["current_theme"] = theme
-        save_data("themes.json", themes)
+        postit_height = first_postit_frame.winfo_height()
+        self.root.update_idletasks()
+        if postit_height <= 0:
+            return
 
-    def update_next_week_preview(self):
-        update_next_week_preview(self)
+        min_next_week_height = 150
+        next_week_height = max(postit_height, min_next_week_height)
 
-    # Mudança aqui: Funcao de editar item
-    def edit_item(self, event):
-        try:
-            self.edit_mode = True
-            selected_index = self.next_week_preview.curselection()[0]
-            selected_item = self.next_week_preview.get(selected_index)
-            self.current_index = selected_item
-            self.next_week_text.delete("1.0", tk.END)
-            self.next_week_text.insert(tk.END, selected_item)
-            self.next_week_save_button.config(text="Atualizar")
-        except IndexError:
-            pass
-
-    # Mudança aqui: Funcoes de Drag and Drop
-    def on_drag_start(self, event):
-        self.current_index = self.next_week_preview.nearest(event.y)
-
-    def on_drag_motion(self, event):
-        new_index = self.next_week_preview.nearest(event.y)
-
-        if new_index != self.current_index:
-            item = self.next_week_preview.get(self.current_index)
-            self.next_week_preview.delete(self.current_index)
-            self.next_week_preview.insert(new_index, item)
-            self.current_index = new_index
-            self.model.reorder_next_week_item(self.current_index)
-    def remove_selected_item(self):
-        try:
-            selected_index = self.next_week_preview.curselection()[0]
-            selected_item = self.next_week_preview.get(selected_index)
-            self.model.remove_next_week_item(selected_item)
-            self.update_next_week_preview()
-        except IndexError:
-            pass
-    def save_next_week_item(self):
-        item = self.next_week_text.get("1.0", tk.END).strip()
-        if item:
-            if self.edit_mode:
-                # Mudança aqui: Editar o item, e não apendar ele.
-                self.model.edit_next_week_item(self.current_index, item)
-                self.next_week_save_button.config(text="Adicionar")
-                self.edit_mode = False
-            else:
-                self.model.add_next_week_item(item)
-            self.next_week_text.delete("1.0", tk.END)
-            self.update_next_week_preview()
-
+        self.next_week_frame.config(height=next_week_height)

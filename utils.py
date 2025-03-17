@@ -10,11 +10,13 @@ def get_start_of_week(date):
 def get_end_of_week(date):
     return get_start_of_week(date) + timedelta(days=6)
 
-def get_formated_date(date, day_name=False):
+def get_formated_date(date, day_name=False, month_name=False): # Mudança aqui: add mes_name
     if day_name:
-        return date.strftime("%a, %d/%m")  # Mudança aqui: "%A, %d %B" para "%a, %d/%m"
+        return date.strftime("%a, %d/%m")
+    elif month_name: # Mudança aqui: criar a verificação se tem que retornar o mes
+        return date.strftime("%d de %B") # Mudança aqui: Retornando o dia e o mes por extenso.
     else:
-        return date.strftime("%d/%m")  # Mudança aqui: "%d %B" para "%d/%m"
+        return date.strftime("%d/%m")
 
 def save_data(file_name, data):
     import json
