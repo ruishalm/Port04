@@ -12,9 +12,9 @@ def get_end_of_week(date):
 
 def get_formated_date(date, day_name=False):
     if day_name:
-        return date.strftime("%a, %d/%m") # Mudança aqui: "%A, %d %B" para "%a, %d/%m"
+        return date.strftime("%a, %d/%m")  # Mudança aqui: "%A, %d %B" para "%a, %d/%m"
     else:
-        return date.strftime("%d/%m") # Mudança aqui: "%d %B" para "%d/%m"
+        return date.strftime("%d/%m")  # Mudança aqui: "%d %B" para "%d/%m"
 
 def save_data(file_name, data):
     import json
@@ -30,9 +30,9 @@ def load_data(file_name):
             if isinstance(data, dict):
                 return data
             else:
-                return [] # if is not a dict, return a empty list.
+                return []  # if is not a dict, return a empty list.
     except FileNotFoundError:
-        return {} # if the file does not exist, return an empty dict.
+        return {}  # if the file does not exist, return an empty dict.
 
 def clear_frame(frame):
     for widget in frame.winfo_children():
